@@ -1,4 +1,4 @@
-# A Thermostat make from an Arduino
+# An Arduino Thermostat
 
 Parts:
 
