@@ -8,3 +8,5 @@ Parts:
 - Buttons
 - LED
 - Relay
+
+This uses the [Arduino makefile](https://github.com/sudar/Arduino-Makefile.git).
