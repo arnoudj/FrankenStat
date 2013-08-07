@@ -17,7 +17,7 @@ int   nsamp       = 50;
 float TargetTemp  = 21;
 float cur         = 0;
 int   lastTemptr  = 0;
-int   lastTempsz  = 30;
+int   lastTempsz  = 15;
 float lastTemps[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 char *days[]      = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
@@ -69,10 +69,12 @@ float getAvgTemp() {
 // Update the display.
 void updateDisplay() {
   lcd.setCursor(0, 0);
-  lcd.print("T:");
+  lcd.print("T:      ");
+  lcd.setCursor(2, 0);
   lcd.print(TargetTemp);
   lcd.setCursor(0, 1);
-  lcd.print("C:");
+  lcd.print("C:      ");
+  lcd.setCursor(2, 1);
   lcd.print(cur);
   
   lcd.setCursor(11,0);
