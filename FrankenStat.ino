@@ -20,7 +20,7 @@ int   lastTemptr  = 0;
 int   lastTempsz  = 15;
 float lastTemps[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-char *days[]      = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
+char *days[]      = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
 boolean time      = true;
 boolean timeState = true;
 tmElements_t tm;
@@ -35,10 +35,12 @@ Bounce down = Bounce(ButtonDown, 50);
 
 // Read the temperature from the sensor.
 float getTemp() {
-  float ThermValue = analogRead(ThermPin);
+  // We're measuring against 3.3V (which is actually 3.4V), in stead of the
+  // expected 5V. So we will multiply by 0.68.
+  float ThermValue = analogRead(ThermPin) * 0.68;
   float mVout=(float) ThermValue*5000.0/1023.0; //3.0V = 3000mV
   //float TempC=(mVout-400.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Original
-  float TempC=(mVout-400.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
+  float TempC=(mVout-390.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
 
   return TempC;
 }
@@ -68,6 +70,7 @@ float getAvgTemp() {
 
 // Update the display.
 void updateDisplay() {
+  // Current and Target temperature
   lcd.setCursor(0, 0);
   lcd.print("T:      ");
   lcd.setCursor(2, 0);
@@ -77,12 +80,17 @@ void updateDisplay() {
   lcd.setCursor(2, 1);
   lcd.print(cur);
   
-  lcd.setCursor(11,0);
+  // DoW
+  lcd.setCursor(8,0);
+  lcd.print(days[tm.Wday]);
+
+  // Time
   int hh = tm.Hour;
   int mm = tm.Minute;
   int yyyy = tm.Year;
   int mon = tm.Month;
   int day = tm.Day;
+  lcd.setCursor(11,0);
   if(hh < 10) lcd.print('0');
   lcd.print(hh);
   if(timeState) {
@@ -95,8 +103,6 @@ void updateDisplay() {
   }
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
-  lcd.setCursor(8,0);
-  lcd.print(days[tm.Wday]);
 }
 
 void intTemp() {
@@ -122,18 +128,25 @@ void intTemp() {
 }
 
 void setup() {
-  //Serial.begin(9600);
+  analogReference(EXTERNAL);
   lcd.begin(16, 2);
+  //lcd.print("FrankenStat v0.1");
+  //lcd.setCursor(0,1);
+  //lcd.print("Initializing");
   pinMode(ButtonUp, INPUT);
   pinMode(ButtonDown, INPUT);
   pinMode(ThermPin, INPUT);
   pinMode(Burner, OUTPUT);
   digitalWrite(Burner, HIGH);
-  delay(500);
+  //lcd.print(".");
+  delay(200);
   digitalWrite(Burner, LOW);
+  //lcd.print(".");
   for(int i = 0; i < lastTempsz; i++) {
     lastTemps[i] = getTemp();
   }
+  lcd.print(".");
+  //lcd.clear();
   getTime();
   Timer1.initialize(1000000);    // 1 second timer interrupt
   Timer1.attachInterrupt(intTemp);
