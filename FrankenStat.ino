@@ -2,29 +2,31 @@
 #include <Time.h>
 #include <Wire.h>
 #include <Bounce.h>
-#include <TimerOne.h>
 #include <LiquidCrystal.h>
+#include <VirtualWire.h>
 
 #define DS1307_I2C_ADDRESS 0x68  // This is the I2C address
 #define BURNING 1
 #define IDLE 0
+#define RFTX 9
 
-int   ThermPin    = 0;
-int   ButtonDown  = 6;
-int   ButtonUp    = 7;
-int   Burner      = 8;
-int   nsamp       = 50;
-float TargetTemp  = 21;
-float cur         = 0;
-int   lastTemptr  = 0;
-int   lastTempsz  = 15;
-float lastTemps[] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+int   ThermPin     = 0;
+int   ButtonDown   = 6;
+int   ButtonUp     = 7;
+int   Burner       = 13;
+int   nsamp        = 50;
+float TargetTemp   = 21;
+float cur          = 0;
+int   lastTemptr   = 0;
+int   lastTempsz   = 15;
+float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-char *days[]      = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
-boolean time      = true;
-boolean timeState = true;
+char *days[]       = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
+boolean time       = true;
+boolean onoff      = true;
 tmElements_t tm;
-int     state     = IDLE;
+char    state      = IDLE;
+unsigned long last = millis();
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
@@ -93,19 +95,17 @@ void updateDisplay() {
   lcd.setCursor(11,0);
   if(hh < 10) lcd.print('0');
   lcd.print(hh);
-  if(timeState) {
-    timeState=false;
-    lcd.print(" ");
+  if(tm.Second % 2 == 0) {
+    lcd.print(":");
   }
   else {
-    timeState=true;
-    lcd.print(":");
+    lcd.print(" ");
   }
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
 }
 
-void intTemp() {
+void checkTemp() {
   cur = getAvgTemp();
   updateDisplay();
 
@@ -130,26 +130,21 @@ void intTemp() {
 void setup() {
   analogReference(EXTERNAL);
   lcd.begin(16, 2);
-  //lcd.print("FrankenStat v0.1");
-  //lcd.setCursor(0,1);
-  //lcd.print("Initializing");
   pinMode(ButtonUp, INPUT);
   pinMode(ButtonDown, INPUT);
   pinMode(ThermPin, INPUT);
   pinMode(Burner, OUTPUT);
-  digitalWrite(Burner, HIGH);
-  //lcd.print(".");
-  delay(200);
-  digitalWrite(Burner, LOW);
-  //lcd.print(".");
+
+  // Setting up the RF Transmitter
+  //vw_setup(2000);
+  //vw_set_tx_pin(RFTX);
+
   for(int i = 0; i < lastTempsz; i++) {
     lastTemps[i] = getTemp();
   }
-  lcd.print(".");
-  //lcd.clear();
+  lcd.clear();
   getTime();
-  Timer1.initialize(1000000);    // 1 second timer interrupt
-  Timer1.attachInterrupt(intTemp);
+  last = millis();
 }
 
 void loop() {
@@ -165,8 +160,13 @@ void loop() {
     updateDisplay();
   }
   
-  if(time == true) {
-    time=false;
+  if(millis() - last > 1000) {
+    last = millis();
     getTime();
+    checkTemp();
+    updateDisplay();
+    //onoff = ! onoff;
+    //vw_send((uint8_t *)onoff, 1);
+    //vw_wait_tx();
   }
 }
