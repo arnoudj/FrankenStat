@@ -1,9 +1,16 @@
+//#define HAS_LCD
+#define HAS_RF
+
 #include <DS1307RTC.h>
 #include <Time.h>
 #include <Wire.h>
 #include <Bounce.h>
+#ifdef HAS_LCD
 #include <LiquidCrystal.h>
+#endif
+#ifdef HAS_RF
 #include <VirtualWire.h>
+#endif
 
 #define DS1307_I2C_ADDRESS 0x68  // This is the I2C address
 #define BURNING 1
@@ -29,7 +36,9 @@ char    state      = IDLE;
 unsigned long last = millis();
 
 // initialize the library with the numbers of the interface pins
+#ifdef HAS_LCD
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+#endif
 
 // Initialize debouncer
 Bounce up = Bounce(ButtonUp, 50);
@@ -72,6 +81,13 @@ float getAvgTemp() {
 
 // Update the display.
 void updateDisplay() {
+  int hh = tm.Hour;
+  int mm = tm.Minute;
+  int yyyy = tm.Year;
+  int mon = tm.Month;
+  int day = tm.Day;
+
+#ifdef HAS_LCD
   // Current and Target temperature
   lcd.setCursor(0, 0);
   lcd.print("T:      ");
@@ -87,11 +103,6 @@ void updateDisplay() {
   lcd.print(days[tm.Wday]);
 
   // Time
-  int hh = tm.Hour;
-  int mm = tm.Minute;
-  int yyyy = tm.Year;
-  int mon = tm.Month;
-  int day = tm.Day;
   lcd.setCursor(11,0);
   if(hh < 10) lcd.print('0');
   lcd.print(hh);
@@ -103,6 +114,21 @@ void updateDisplay() {
   }
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
+#else
+  Serial.print("##### ");
+  Serial.print(days[tm.Wday]);
+  Serial.print(" ");
+  if(hh < 10) Serial.print('0');
+  Serial.print(hh);
+  Serial.print(":");
+  if(mm < 10) Serial.print('0');
+  Serial.println(mm);
+  Serial.print("Target:  ");
+  Serial.println(TargetTemp);
+  Serial.print("Current: ");
+  Serial.println(cur);
+  Serial.println();
+#endif
 }
 
 void checkTemp() {
@@ -129,20 +155,26 @@ void checkTemp() {
 
 void setup() {
   analogReference(EXTERNAL);
+#ifdef HAS_LCD
   lcd.begin(16, 2);
+#else
+  Serial.begin(9600);
+#endif
   pinMode(ButtonUp, INPUT);
   pinMode(ButtonDown, INPUT);
   pinMode(ThermPin, INPUT);
   pinMode(Burner, OUTPUT);
 
+#ifdef HAS_RF
   // Setting up the RF Transmitter
-  //vw_setup(2000);
-  //vw_set_tx_pin(RFTX);
+  vw_set_tx_pin(RFTX);
+  vw_set_ptt_inverted(true);
+  vw_setup(2000);
+#endif
 
   for(int i = 0; i < lastTempsz; i++) {
     lastTemps[i] = getTemp();
   }
-  lcd.clear();
   getTime();
   last = millis();
 }
@@ -165,8 +197,10 @@ void loop() {
     getTime();
     checkTemp();
     updateDisplay();
-    //onoff = ! onoff;
-    //vw_send((uint8_t *)onoff, 1);
-    //vw_wait_tx();
+#ifdef HAS_RF
+    onoff = !onoff;
+    vw_send((uint8_t *)onoff, 1);
+    vw_wait_tx();
+#endif
   }
 }
