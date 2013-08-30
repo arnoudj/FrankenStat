@@ -1,11 +1,16 @@
 # An Arduino Thermostat
 
+The FrankenStat conists of 2 arduino's. The first is the MCP, which has the
+controls, display and the logic. The 2nd Arduino, the BC, controls the CV
+burner. Both Arduino's communicate through a 433MHz link.
+
 Parts:
 
-- MCP9701 Thermistor
+- 2x Arduino Nano
+- 2x MCP9701 Thermistor
 - Hitachi HD44780 compatible LCD screen
 - DS1307 RTC
-- Buttons
+- 2x Buttons
 - LED
 - Relay
 
