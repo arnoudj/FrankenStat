@@ -163,6 +163,17 @@ void checkTemp() {
   time = true;
 }
 
+#ifdef HAS_ETH
+//
+// Read the HTTP request and returns the corresponding reply.
+//
+int16_t process_request(char *str)
+{
+  if (strncmp("GET ",(char *)&(Ethernet::buffer[dat_p]),4)==0){
+  }
+}
+#endif
+
 void setup() {
   analogReference(EXTERNAL);
 #ifdef HAS_LCD
@@ -211,15 +222,6 @@ void loop() {
     TargetTemp -= 0.5;
     updateDisplay();
   }
-  
-#ifdef HAS_ETH
-  char page[] PROGMEM = "aap!";
-
-  if (ether.packetLoop(ether.packetReceive())) {
-    memcpy_P(ether.tcpOffset(), page, sizeof page);
-    ether.httpServerReply(sizeof page - 1);
-  }
-#endif
 
   if(millis() - last > 1000) {
     last = millis();
@@ -227,9 +229,19 @@ void loop() {
     checkTemp();
     updateDisplay();
 #ifdef HAS_RF
+    // Testcode. Sends a boolean true and false every second.
     onoff = !onoff;
     vw_send((uint8_t *)onoff, 1);
     vw_wait_tx();
 #endif
   }
+
+#ifdef HAS_ETH
+  uint16_t plen, dat_p;
+
+  if (ether.packetLoop(ether.packetReceive())) {
+    dat_p = process_request((char *)&(Ethernet::buffer[dat_p]));
+    if( dat_p ) ether.httpServerReply(dat_p);
+  }
+#endif
 }
