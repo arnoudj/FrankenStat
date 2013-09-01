@@ -1,15 +1,18 @@
 //#define HAS_LCD
 #define HAS_RF
+#define HAS_ETH
 
 #include <DS1307RTC.h>
 #include <Time.h>
-#include <Wire.h>
 #include <Bounce.h>
 #ifdef HAS_LCD
 #include <LiquidCrystal.h>
 #endif
 #ifdef HAS_RF
 #include <VirtualWire.h>
+#endif
+#ifdef HAS_ETH
+#include <EtherCard.h>
 #endif
 
 #define DS1307_I2C_ADDRESS 0x68  // This is the I2C address
@@ -38,6 +41,13 @@ unsigned long last = millis();
 // initialize the library with the numbers of the interface pins
 #ifdef HAS_LCD
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+#endif
+
+#ifdef HAS_ETH
+static byte myip[] = { 192,168,2,128 };
+static byte gwip[] = { 192,168,2,1 };
+static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
+byte Ethernet::buffer[500];
 #endif
 
 // Initialize debouncer
@@ -172,6 +182,16 @@ void setup() {
   vw_setup(2000);
 #endif
 
+#ifdef HAS_ETH
+  if (ether.begin(sizeof Ethernet::buffer, mymac)) {
+    ether.staticSetup(myip, gwip);
+    Serial.println("Ethernet initialized!");
+  }
+  else {
+    Serial.println("Ethernet not initialized!");
+  }
+#endif
+
   for(int i = 0; i < lastTempsz; i++) {
     lastTemps[i] = getTemp();
   }
@@ -192,6 +212,15 @@ void loop() {
     updateDisplay();
   }
   
+#ifdef HAS_ETH
+  char page[] PROGMEM = "aap!";
+
+  if (ether.packetLoop(ether.packetReceive())) {
+    memcpy_P(ether.tcpOffset(), page, sizeof page);
+    ether.httpServerReply(sizeof page - 1);
+  }
+#endif
+
   if(millis() - last > 1000) {
     last = millis();
     getTime();
