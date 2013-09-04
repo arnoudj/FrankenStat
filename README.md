@@ -24,6 +24,50 @@ This uses the [Arduino makefile](https://github.com/sudar/Arduino-Makefile.git).
 
 I noticed that the temerature would go up, when the LED was turned on by about 0.25 degrees. Measuring the voltage showed a small drop in voltage. This was solved by using the 3.3V power, and hooking the 3.3V power to the AREF pin. See the sensor guide on [Adafruit](http://learn.adafruit.com/tmp36-temperature-sensor/using-a-temp-sensor).
 
+# API
+
+To read the status and control the temperature the following URL's can be used:
+
+## /
+
+Returns the status of the thermostat.
+
+    {
+      "target": 21,
+      "current": 23.15,
+      "burner": false
+    }
+
+## /up
+
+Increase the temporary target temperature. Returns the new target temperature.
+
+    {
+      "target": 21.5,
+      "current": 23.15,
+      "burner": false
+    }
+
+## /down
+
+Decrease the temporary target temperature. Returns the new target temperature.
+
+    {
+      "target": 21.5,
+      "current": 23.15,
+      "burner": false
+    }
+
+## /set/16
+
+Set a new temporary target temperature. Returns the new target temperature.
+
+    {
+      "target": 16.0,
+      "current": 23.15,
+      "burner": false
+    }
+
 # Useful URL\'s
 
 [EtherCard Examples](https://github.com/thiseldo/EtherCardExamples)

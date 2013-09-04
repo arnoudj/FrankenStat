@@ -1,4 +1,4 @@
-//#define HAS_LCD
+#undef HAS_LCD
 #define HAS_RF
 #define HAS_ETH
 
@@ -14,10 +14,9 @@
 #ifdef HAS_ETH
 #include <EtherCard.h>
 #endif
+#include "../include/FrankenStat.h"
 
 #define DS1307_I2C_ADDRESS 0x68  // This is the I2C address
-#define BURNING 1
-#define IDLE 0
 #define RFTX 9
 
 int   ThermPin     = 0;
@@ -48,6 +47,7 @@ static byte myip[] = { 192,168,2,128 };
 static byte gwip[] = { 192,168,2,1 };
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[500];
+BufferFiller bfill;
 #endif
 
 // Initialize debouncer
@@ -165,12 +165,39 @@ void checkTemp() {
 
 #ifdef HAS_ETH
 //
+// Return a JSON string with the thermostat status.
+//
+uint16_t JSON_status() {
+  static char tempbuf[5];
+  static char curbuf[5];
+
+  bfill = ether.tcpOffset();
+  bfill.emit_p(PSTR(
+    "HTTP/1.0 200 OK\r\n"
+    "Content-Type: text/html\r\n"
+    "Pragma: no-cache\r\n"
+    "\r\n"
+    "{\"target\":$S, \"current\":$S, \"burn\":$S}"),
+    dtostrf(TargetTemp,2,1,tempbuf),
+    dtostrf(cur,2,1,curbuf),
+    state ? "true" : "false");
+  return bfill.position();
+}
+
+//
 // Read the HTTP request and returns the corresponding reply.
 //
 int16_t process_request(char *str)
 {
-  if (strncmp("GET ",(char *)&(Ethernet::buffer[dat_p]),4)==0){
+  int index = 0;
+  int plen = 0;
+  char ch = str[index];
+
+  Serial.println(str);
+  if (strncmp("GET ", str, 4)==0){
+    Serial.println("GET");
   }
+  return JSON_status();
 }
 #endif
 
