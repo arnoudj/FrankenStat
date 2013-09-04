@@ -125,19 +125,19 @@ void updateDisplay() {
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
 #else
-  Serial.print("##### ");
-  Serial.print(days[tm.Wday]);
-  Serial.print(" ");
-  if(hh < 10) Serial.print('0');
-  Serial.print(hh);
-  Serial.print(":");
-  if(mm < 10) Serial.print('0');
-  Serial.println(mm);
-  Serial.print("Target:  ");
-  Serial.println(TargetTemp);
-  Serial.print("Current: ");
-  Serial.println(cur);
-  Serial.println();
+  //Serial.print("##### ");
+  //Serial.print(days[tm.Wday]);
+  //Serial.print(" ");
+  //if(hh < 10) Serial.print('0');
+  //Serial.print(hh);
+  //Serial.print(":");
+  //if(mm < 10) Serial.print('0');
+  //Serial.println(mm);
+  //Serial.print("Target:  ");
+  //Serial.println(TargetTemp);
+  //Serial.print("Current: ");
+  //Serial.println(cur);
+  //Serial.println();
 #endif
 }
 
@@ -189,13 +189,11 @@ uint16_t JSON_status() {
 //
 int16_t process_request(char *str)
 {
-  int index = 0;
-  int plen = 0;
-  char ch = str[index];
-
-  Serial.println(str);
-  if (strncmp("GET ", str, 4)==0){
-    Serial.println("GET");
+  if (strncmp("GET /up ", str, 8)==0){
+    TargetTemp += 0.5;
+  }
+  if (strncmp("GET /down ", str, 10)==0){
+    TargetTemp -= 0.5;
   }
   return JSON_status();
 }
@@ -264,9 +262,9 @@ void loop() {
   }
 
 #ifdef HAS_ETH
-  uint16_t plen, dat_p;
+  uint16_t dat_p;
 
-  if (ether.packetLoop(ether.packetReceive())) {
+  if (dat_p = ether.packetLoop(ether.packetReceive())) {
     dat_p = process_request((char *)&(Ethernet::buffer[dat_p]));
     if( dat_p ) ether.httpServerReply(dat_p);
   }
