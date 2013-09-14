@@ -1,4 +1,4 @@
-#undef HAS_LCD
+#define HAS_LCD
 #define HAS_RF
 #define HAS_ETH
 
@@ -6,7 +6,8 @@
 #include <Time.h>
 #include <Bounce.h>
 #ifdef HAS_LCD
-#include <LiquidCrystal.h>
+#include <LCD.h>
+#include <LiquidCrystal_I2C.h>
 #endif
 #ifdef HAS_RF
 #include <VirtualWire.h>
@@ -30,16 +31,16 @@ int   lastTemptr   = 0;
 int   lastTempsz   = 15;
 float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-char *days[]       = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
+char *days[]       = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
 boolean time       = true;
 boolean onoff      = true;
 tmElements_t tm;
-char    state      = IDLE;
+//char    state      = IDLE;
 unsigned long last = millis();
 
 // initialize the library with the numbers of the interface pins
 #ifdef HAS_LCD
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 #endif
 
 #ifdef HAS_ETH
@@ -50,9 +51,64 @@ byte Ethernet::buffer[500];
 BufferFiller bfill;
 #endif
 
+// Initialize the schedule.
+schedule_t schedule[7][4] = {
+  // Sunday
+  {
+    { 1, 10, 0, 21 },
+    { 1, 23, 0, 12 },
+    { 0, 0, 0, 0 },
+    { 0, 0, 0, 0 }
+  },
+  // Monday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Tuesday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Wednesday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Thursday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Friday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Saturday
+  {
+    { 1, 10, 0, 21 },
+    { 1, 23, 0, 12 },
+    { 0, 0, 0, 0 },
+    { 0, 0, 0, 0 }
+  }
+};
+
 // Initialize debouncer
 Bounce up = Bounce(ButtonUp, 50);
 Bounce down = Bounce(ButtonDown, 50);
+
+bit_t bit = { 5262634, false };
 
 // Read the temperature from the sensor.
 float getTemp() {
@@ -125,19 +181,19 @@ void updateDisplay() {
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
 #else
-  //Serial.print("##### ");
-  //Serial.print(days[tm.Wday]);
-  //Serial.print(" ");
-  //if(hh < 10) Serial.print('0');
-  //Serial.print(hh);
-  //Serial.print(":");
-  //if(mm < 10) Serial.print('0');
-  //Serial.println(mm);
-  //Serial.print("Target:  ");
-  //Serial.println(TargetTemp);
-  //Serial.print("Current: ");
-  //Serial.println(cur);
-  //Serial.println();
+  Serial.print("##### ");
+  Serial.print(days[tm.Wday]);
+  Serial.print(" ");
+  if(hh < 10) Serial.print('0');
+  Serial.print(hh);
+  Serial.print(":");
+  if(mm < 10) Serial.print('0');
+  Serial.println(mm);
+  Serial.print("Target:  ");
+  Serial.println(TargetTemp);
+  Serial.print("Current: ");
+  Serial.println(cur);
+  Serial.println();
 #endif
 }
 
@@ -145,17 +201,17 @@ void checkTemp() {
   cur = getAvgTemp();
   updateDisplay();
 
-  switch (state) {
+  switch (bit.burn) {
     case BURNING:
       if(cur > TargetTemp + 0.5) {
         digitalWrite(Burner, LOW);
-        state = IDLE;
+        bit.burn = IDLE;
       }
       break;
     default:
       if(cur < TargetTemp - 0.5) {
         digitalWrite(Burner, HIGH);
-        state = BURNING;
+        bit.burn = BURNING;
       }
       break;
   }
@@ -180,7 +236,7 @@ uint16_t JSON_status() {
     "{\"target\":$S, \"current\":$S, \"burn\":$S}"),
     dtostrf(TargetTemp,2,1,tempbuf),
     dtostrf(cur,2,1,curbuf),
-    state ? "true" : "false");
+    bit.burn ? "true" : "false");
   return bfill.position();
 }
 
@@ -191,9 +247,11 @@ int16_t process_request(char *str)
 {
   if (strncmp("GET /up ", str, 8)==0){
     TargetTemp += 0.5;
+    updateDisplay();
   }
   if (strncmp("GET /down ", str, 10)==0){
     TargetTemp -= 0.5;
+    updateDisplay();
   }
   return JSON_status();
 }
@@ -202,7 +260,8 @@ int16_t process_request(char *str)
 void setup() {
   analogReference(EXTERNAL);
 #ifdef HAS_LCD
-  lcd.begin(16, 2);
+  lcd.begin(16,2);
+  lcd.clear();
 #else
   Serial.begin(9600);
 #endif
@@ -221,7 +280,6 @@ void setup() {
 #ifdef HAS_ETH
   if (ether.begin(sizeof Ethernet::buffer, mymac)) {
     ether.staticSetup(myip, gwip);
-    Serial.println("Ethernet initialized!");
   }
   else {
     Serial.println("Ethernet not initialized!");
@@ -254,9 +312,7 @@ void loop() {
     checkTemp();
     updateDisplay();
 #ifdef HAS_RF
-    // Testcode. Sends a boolean true and false every second.
-    onoff = !onoff;
-    vw_send((uint8_t *)onoff, 1);
+    vw_send((uint8_t *)&bit, sizeof(bit));
     vw_wait_tx();
 #endif
   }
