@@ -1,3 +1,4 @@
 *.o
 build-*
 /.project
+include/prowl.h

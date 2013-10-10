@@ -1,6 +1,6 @@
 // The serial will be send with each package that is transmitted to the
 // Bit. As an extra check to verify we're receiving the right data.
-#define BIT_SERIAL 2343436;
+#define BITSERIAL 62634
 #define BURNING 1
 #define IDLE 0
 
