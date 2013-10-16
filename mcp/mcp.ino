@@ -1,4 +1,5 @@
-#define DEBUG
+// Turn on or off certain functions.
+#undef DEBUG
 #define HAS_LCD
 #define HAS_RF
 #define HAS_ETH
@@ -22,17 +23,20 @@
 #include "../include/prowl.h"
 #endif
 
-#define DS1307_I2C_ADDRESS 0x68  // This is the I2C address
-#define RFTX 9
+// I2C addresses
+#define DS1307_I2C_ADDRESS 0x68
+#define LCD_I2C_ADDRESS 0x27
 
-int   ThermPin     = 0;
-int   ButtonDown   = 6;
-int   ButtonUp     = 7;
-int   Burner       = 13;
-int   nsamp        = 50;
+// Pin assignment
+#define PIN_THERM 0
+#define PIN_DOWN 6
+#define PIN_UP 7
+#define PIN_RFTX 9
+#define PIN_RELAY 13
+
 float cur          = 0;
-float tgt          = 16;
-float tmptgt       = 16;
+float tgt          = 16.0;  // Current target temperature
+float tmptgt       = 16.0;  // Target temperature when a temporary
 int   lastTemptr   = 0;
 int   lastTempsz   = 15;
 float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -48,6 +52,8 @@ typedef struct schedulepointer_ {
   unsigned char line : 4;
 } schedulepointer_t;
 
+// sp_now holds the current schedule, sp_tmp holds the schedule at which
+// the temporary temperature was set.
 schedulepointer_t sp_now, sp_tmp;
 
 #ifdef HAS_PROWL
@@ -56,7 +62,7 @@ Stash stash;
 
 // initialize the library with the numbers of the interface pins
 #ifdef HAS_LCD
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
+LiquidCrystal_I2C lcd(LCD_I2C_ADDRESS, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 #endif
 
 #ifdef HAS_ETH
@@ -122,8 +128,8 @@ schedule_t schedule[7][4] = {
 };
 
 // Initialize debouncer
-Bounce up = Bounce(ButtonUp, 50);
-Bounce down = Bounce(ButtonDown, 50);
+Bounce up = Bounce(PIN_UP, 50);
+Bounce down = Bounce(PIN_DOWN, 50);
 
 bit_t bit = { BITSERIAL, false };
 
@@ -190,7 +196,7 @@ float scheduledTemp() {
 float getTemp() {
   // We're measuring against 3.3V (which is actually 3.4V), in stead of the
   // expected 5V. So we will multiply by 0.68.
-  float ThermValue = analogRead(ThermPin) * 0.68;
+  float ThermValue = analogRead(PIN_THERM) * 0.68;
   float mVout=(float) ThermValue*5000.0/1023.0; //3.0V = 3000mV
   //float TempC=(mVout-400.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Original
   float TempC=(mVout-390.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
@@ -278,11 +284,12 @@ void sendProwl() {
     stash.print(PROWL_APIKEY);
     stash.print("&application=FrankenTherm&event=");
     if(bit.burn) {
-      stash.print("Burning");
-    }
-    else {
       stash.print("Idle");
     }
+    else {
+      stash.print("Burning");
+    }
+    stash.save();
     /*
     stash.print("&description=");
     if(bit.burn) {
@@ -326,7 +333,7 @@ void checkTemp() {
   switch (bit.burn) {
     case BURNING:
       if(cur > tgt + 0.5) {
-        digitalWrite(Burner, LOW);
+        digitalWrite(PIN_RELAY, LOW);
         if(bit.burn != IDLE) {
 #ifdef DEBUG
           Serial.println("Off");
@@ -340,7 +347,7 @@ void checkTemp() {
       break;
     default:
       if(cur < tgt - 0.5) {
-        digitalWrite(Burner, HIGH);
+        digitalWrite(PIN_RELAY, HIGH);
         if(bit.burn != BURNING) {
 #ifdef DEBUG
           Serial.println("On");
@@ -417,14 +424,14 @@ void setup() {
   Serial.begin(115200);
 #endif
 
-  pinMode(ButtonUp, INPUT);
-  pinMode(ButtonDown, INPUT);
-  pinMode(ThermPin, INPUT);
-  pinMode(Burner, OUTPUT);
+  pinMode(PIN_UP, INPUT);
+  pinMode(PIN_DOWN, INPUT);
+  pinMode(PIN_THERM, INPUT);
+  pinMode(PIN_RELAY, OUTPUT);
 
 #ifdef HAS_RF
   // Setting up the RF Transmitter
-  vw_set_tx_pin(RFTX);
+  vw_set_tx_pin(PIN_RFTX);
   vw_set_ptt_inverted(true);
   vw_setup(2000);
 #endif
