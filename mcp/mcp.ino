@@ -37,11 +37,18 @@ int   lastTemptr   = 0;
 int   lastTempsz   = 15;
 float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 char *days[]       = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
-boolean time       = true;
-boolean onoff      = true;
+//char *modes[]       = { "AUTO", "TEMP", "MANUAL", "HOLIDAY", "NOFROST" };
 tmElements_t tm;
 //char    state      = IDLE;
 unsigned long last = millis();
+char  mode = 0;
+
+typedef struct schedulepointer_ {
+  unsigned char day : 4;
+  unsigned char line : 4;
+} schedulepointer_t;
+
+schedulepointer_t sp_now, sp_tmp;
 
 #ifdef HAS_PROWL
 Stash stash;
@@ -54,7 +61,7 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
 #ifdef HAS_ETH
 static byte myip[] = { 192,168,2,128 };
-static byte gwip[] = { 192,168,2,1 };
+static byte gwip[] = { 192,168,2,254 };
 static byte dnsip[] = { 192,168,2,254 };
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 byte Ethernet::buffer[250];
@@ -63,49 +70,49 @@ BufferFiller bfill;
 
 // Initialize the schedule.
 schedule_t schedule[7][4] = {
-  // 00 Sunday
+  // Monday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Tuesday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Wednesday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Thursday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 50 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Friday
+  {
+    { 1, 8, 0, 19 },
+    { 1, 8, 2, 12 },
+    { 1, 18, 2, 21 },
+    { 1, 23, 2, 12 }
+  },
+  // Saturday
   {
     { 1, 10, 0, 21 },
     { 1, 23, 2, 12 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 }
   },
-  // 01 Monday
-  {
-    { 1, 8, 0, 19 },
-    { 1, 8, 2, 12 },
-    { 1, 18, 2, 21 },
-    { 1, 23, 2, 12 }
-  },
-  // 02 Tuesday
-  {
-    { 1, 8, 0, 19 },
-    { 1, 8, 2, 12 },
-    { 1, 18, 2, 21 },
-    { 1, 23, 2, 12 }
-  },
-  // 03 Wednesday
-  {
-    { 1, 8, 0, 19 },
-    { 1, 8, 2, 12 },
-    { 1, 18, 2, 21 },
-    { 1, 23, 2, 12 }
-  },
-  // 04 Thursday
-  {
-    { 1, 8, 0, 19 },
-    { 1, 8, 2, 12 },
-    { 1, 18, 2, 21 },
-    { 1, 23, 2, 12 }
-  },
-  // 05 Friday
-  {
-    { 1, 8, 0, 19 },
-    { 1, 8, 2, 12 },
-    { 1, 18, 2, 21 },
-    { 1, 23, 2, 12 }
-  },
-  // 06 Saturday
+  // Sunday
   {
     { 1, 10, 0, 21 },
     { 1, 23, 2, 12 },
@@ -134,24 +141,49 @@ int lastTemp(int d) {
     d = 6;
   }
   for(int i = 3; i >= 0; i--) {
-    if(schedule[d][i].active == 1) {
-      return schedule[d][i].temp;
+    if(schedule[d-1][i].active == 1) {
+      sp_now.day = tm.Wday;
+      sp_now.line = i;
+      return schedule[d-1][i].temp;
     }
   }
   return 0;
 }
 
 float scheduledTemp() {
+  float target;
+
   for(int i = 3; i >= 0; i--) {
-    if(schedule[tm.Wday][i].active == 0) {
+    if(schedule[tm.Wday-1][i].active == 0) {
       continue;
     }
-    if(hq2min(schedule[tm.Wday][i].hour, schedule[tm.Wday][i].quarters) <
+    if(hq2min(schedule[tm.Wday-1][i].hour, schedule[tm.Wday-1][i].quarters) <
        hm2min(tm.Hour,tm.Minute)) {
-      return (float)schedule[tm.Wday][i].temp / 2 + 10;
+      sp_now.day = tm.Wday;
+      sp_now.line = i;
+      target = (float)schedule[tm.Wday-1][i].temp / 2 + 10;
     }
   }
-  return (float)lastTemp(tm.Wday-1) / 2 + 10;
+  target = (float)lastTemp(tm.Wday-1) / 2 + 10;
+
+  switch(mode) {
+    case MODE_TEMP:
+      if(sp_now.day == sp_tmp.day and sp_now.line == sp_tmp.line) {
+        // Still on the same setpoint on which we set the temporary
+        // temperature.
+        tgt = tmptgt;
+      }
+      else {
+        mode = MODE_AUTO;
+        break;
+      }
+    case MODE_OVERRIDE:
+      return tmptgt;
+    case MODE_NOFROST:
+      return 5.0;
+  }
+
+  tgt = target;
 }
 
 // Read the temperature from the sensor.
@@ -171,9 +203,8 @@ void getTime() {
 }
 
 // Return the average temperature for the last minute.
-float getAvgTemp() {
-  float TempC = getTemp();
-  lastTemps[lastTemptr] = TempC;
+void getAvgTemp() {
+  lastTemps[lastTemptr] = getTemp();
   if(++lastTemptr == lastTempsz) {
     lastTemptr = 0;
   }
@@ -186,16 +217,13 @@ float getAvgTemp() {
   
   //Serial.println(avg);
   
-  return avg;
+  cur = avg;
 }
 
 // Update the display.
 void updateDisplay() {
   int hh = tm.Hour;
   int mm = tm.Minute;
-  int yyyy = tm.Year;
-  int mon = tm.Month;
-  int day = tm.Day;
 
 #ifdef HAS_LCD
   // Current and Target temperature
@@ -225,7 +253,6 @@ void updateDisplay() {
 #endif
 
 #ifdef DEBUG
-  Serial.print("##### ");
   Serial.print(days[tm.Wday]);
   Serial.print(" ");
   if(hh < 10) Serial.print('0');
@@ -233,46 +260,67 @@ void updateDisplay() {
   Serial.print(":");
   if(mm < 10) Serial.print('0');
   Serial.println(mm);
-  Serial.print("Target:  ");
+  Serial.print(F("tgt: "));
   Serial.println(tgt);
-  Serial.print("Current: ");
+  Serial.print(F("cur: "));
   Serial.println(cur);
+  Serial.print(F("mod: "));
+  Serial.println((int)mode);
   Serial.println();
 #endif
 }
 
 #ifdef HAS_PROWL
 void sendProwl() {
-//  if(ether.dnsLookup(prowl_domain)) {
+  if(ether.dnsLookup(prowl_domain)) {
     byte sd = stash.create();
     stash.print("apikey=");
     stash.print(PROWL_APIKEY);
-    stash.print("&application=FrankenTherm&event=i");
-    stash.print(bit.burn ? "Burning" : "Idle");
+    stash.print("&application=FrankenTherm&event=");
+    if(bit.burn) {
+      stash.print("Burning");
+    }
+    else {
+      stash.print("Idle");
+    }
+    /*
     stash.print("&description=");
-    stash.print(bit.burn ? "Started burning." : "Stopped burning.");
+    if(bit.burn) {
+      stash.print("Started burning.");
+    }
+    else {
+      stash.print("Stopped burning.");
+    }
+    */
 
-    Stash::prepare(PSTR("POST http://$F/api.prowlapp.com/publicapi/add" "\r\n"
+    Stash::prepare(PSTR("POST /publicapi/add HTTP/1.1" "\r\n"
+      "User-Agent: FrankenStat/0.1.0" "\r\n"
       "Host: $F" "\r\n"
       "Content-Type: application/x-www-form-urlencoded" "\r\n"
       "Content-Length: $D" "\r\n"
       "\r\n"
       "$H"
     ),
-    "api.prowlapp.com", stash.size(), sd);
-    ether.tcpSend();
-//  }
-//  else {
-//#ifdef DEBUG
-//    Serial.println("Could not resolve domain.");
-//#endif
-//  }
+    prowl_domain, stash.size(), sd);
+    int session = ether.tcpSend();
+    const char* reply = ether.tcpReply(session);
+    if(reply != 0) {
+      Serial.println(F(">>> RESPONSE RECEIVED ---"));
+      Serial.println(reply);
+    }
+    else {
+      Serial.println(F(">>> Prowl OK"));
+    }
+  }
+  else {
+    mode=99;
+  }
 }
 #endif
 
 void checkTemp() {
-  tgt = scheduledTemp();
-  cur = getAvgTemp();
+  scheduledTemp();
+  getAvgTemp();
   updateDisplay();
 
   switch (bit.burn) {
@@ -281,7 +329,7 @@ void checkTemp() {
         digitalWrite(Burner, LOW);
         if(bit.burn != IDLE) {
 #ifdef DEBUG
-          Serial.println(PSTR("Burner off"));
+          Serial.println("Off");
 #endif
 #ifdef HAS_PROWL
           sendProwl();
@@ -295,7 +343,7 @@ void checkTemp() {
         digitalWrite(Burner, HIGH);
         if(bit.burn != BURNING) {
 #ifdef DEBUG
-          Serial.println(PSTR("Burner on"));
+          Serial.println("On");
 #endif
 #ifdef HAS_PROWL
           sendProwl();
@@ -305,8 +353,6 @@ void checkTemp() {
       }
       break;
   }
-  
-  time = true;
 }
 
 #ifdef HAS_ETH
@@ -323,11 +369,23 @@ uint16_t JSON_status() {
     "Content-Type: text/html\r\n"
     "Pragma: no-cache\r\n"
     "\r\n"
-    "{\"target\":$S, \"current\":$S, \"burn\":$S}"),
+    "{\"target\":$S, \"current\":$S, \"burn\":$S, \"mode\":$D}\r\n"),
     dtostrf(tgt,2,1,tempbuf),
     dtostrf(cur,2,1,curbuf),
-    bit.burn ? "true" : "false");
+    bit.burn ? "true" : "false",
+    mode
+  );
   return bfill.position();
+}
+
+// Temporarily set a new temperature until the next setpoint.
+void setModeTemp() {
+  if(mode == MODE_AUTO) {
+    mode = MODE_TEMP;
+    tmptgt = tgt;
+    sp_tmp.day = sp_now.day;
+    sp_tmp.line = sp_now.line;
+  }
 }
 
 //
@@ -336,11 +394,14 @@ uint16_t JSON_status() {
 int16_t process_request(char *str)
 {
   if (strncmp("GET /up ", str, 8)==0){
+    setModeTemp();
     tmptgt += 0.5;
   }
   if (strncmp("GET /down ", str, 10)==0){
+    setModeTemp();
     tmptgt -= 0.5;
   }
+  scheduledTemp();
   return JSON_status();
 }
 #endif
@@ -353,7 +414,7 @@ void setup() {
 #endif
 
 #ifdef DEBUG
-  Serial.begin(9600);
+  Serial.begin(115200);
 #endif
 
   pinMode(ButtonUp, INPUT);
@@ -375,15 +436,9 @@ void setup() {
     ether.printIp("GW:  ", ether.gwip);  
     ether.printIp("DNS: ", ether.dnsip);
   }
-  else {
-    Serial.println(PSTR("Ethernet not initialized!"));
-  }
-  //while (ether.clientWaitingGw())
-  //  ether.packetLoop(ether.packetReceive());
-  //Serial.println("Gateway found");
-  //if(!ether.dnsLookup(PSTR("api.prowlapp.com"))) {
-  //  Serial.println("DNS fail!");
-  //}
+  while (ether.clientWaitingGw())
+    ether.packetLoop(ether.packetReceive());
+  Serial.println(F("Ethernet ready!"));
 #endif
 
   for(int i = 0; i < lastTempsz; i++) {
@@ -396,12 +451,14 @@ void setup() {
 void loop() {
   up.update();
   if(up.fallingEdge()) {
+    setModeTemp();
     tmptgt += 0.5;
     updateDisplay();
   }
   
   down.update();
   if(down.fallingEdge()) {
+    setModeTemp();
     tmptgt -= 0.5;
     updateDisplay();
   }
@@ -414,10 +471,6 @@ void loop() {
 #ifdef HAS_RF
     vw_send((uint8_t *)&bit, sizeof(bit));
     vw_wait_tx();
-#ifdef DEBUG
-    Serial.print("Message size: ");
-    Serial.println(sizeof(bit));
-#endif
 #endif
   }
 

@@ -3,6 +3,11 @@
 #define BITSERIAL 62634
 #define BURNING 1
 #define IDLE 0
+#define MODE_AUTO 0
+#define MODE_TEMP 1
+#define MODE_OVERRIDE 2
+#define MODE_HOLIDAY 3
+#define MODE_NOFROST 4
 
 // Data set, which will be send over the 433MHz link to the BC.
 typedef struct bit_ {
