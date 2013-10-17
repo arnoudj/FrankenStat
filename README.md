@@ -1,22 +1,47 @@
 # An Arduino Thermostat
 
+I started this project to create a thermostat which could be controlled from the internet with the following features:
+
+- REST API
+- one unit connected to the CV and a unit to control the thermostat
+- both units communicating via RF
+- have a program for every day of the week with up to 4 time intervals to set a temperature
+- be able to temporarily change a temperature for a time interval
+- holiday mode, set a specific temperature which will be held until the mode is disabled
+
 The FrankenStat conists of 2 arduino's. The first is the MCP, which has the
-controls, display and the logic. The 2nd Arduino, the Bit, controls the CV
-burner. Both Arduino's communicate through a 433MHz link.
+controls, display and the logic. The 2nd Arduino is called BIT and controls
+the CV burner. Both Arduino's communicate through a 433MHz RF link.
 
-Parts:
+# Parts
 
-- 2x Arduino Nano
+- 2x Atmega328 based Arduino
 - 2x MCP9701 Thermistor
 - Hitachi HD44780 compatible LCD screen with I2C interface adapter
 - DS1307 RTC
 - 2x Buttons
+- 433 MHz RF receiver
+- 433 MHz RF transmitter
 - LED
 - Relay
 
-This uses the [Arduino makefile](https://github.com/sudar/Arduino-Makefile.git).
-
 Before compiling copy include/prowl.h-example to include/prowl.h and insert your Prowl API key (make one on the Prowl site, if you don't already have one).
+
+# Building
+
+I use the [Arduino makefile](https://github.com/sudar/Arduino-Makefile.git), as I hate the Arduino IDE. This should work on Linux and Mac OS X.
+
+    git clone https://github.com/sudar/Arduino-Makefile.git
+    ln -s Arduino-Makefile/arduino-mk
+    git clone https://github.com/arnoudj/FrankenStat.git
+    cd FrankenStat
+    cp include/prowl.h-example include/prowl.h # and change the API key
+    cd mcp
+    vi Makefile # and change the device name for your arduino
+    make upload
+    cd ../bit
+    vi Makefile # and change the device name for your arduino
+    make upload
 
 # Schematic
 
@@ -38,45 +63,64 @@ Returns the status of the thermostat.
 
     {
       "target": 21,
-      "current": 23.15,
+      "current": 21.15,
       "burner": false,
       "mode": 0
     }
 
 ## /up
 
-Increase the temporary target temperature. Returns the new target temperature.
+Increase the target temperature. If the mode is set to auto, then mode will be set to temp. Returns the new target temperature and mode.
 
     {
       "target": 21.5,
-      "current": 23.15,
+      "current": 21.15,
       "burner": false,
-      "mode": 0
+      "mode": 1
     }
 
 ## /down
 
-Decrease the temporary target temperature. Returns the new target temperature.
+Decrease the target temperature. If the mode is set to auto, then mode will be set to temp. Returns the new target temperature and mode.
 
     {
       "target": 21.5,
-      "current": 23.15,
+      "current": 21.15,
       "burner": false,
-      "mode": 0
+      "mode": 1
     }
 
-## /set/16
+## /mode/MODE[/16]
 
-Set a new temporary target temperature. Returns the new target temperature.
+Set the operating mode. Modes can be:
+
+0: Automatic.
+1: Temporary
+2: Holiday
+
+Returns the new target temperature.
 
     {
       "target": 16.0,
-      "current": 23.15,
+      "current": 21.15,
       "burner": false,
-      "mode": 0
+      "mode": 1
     }
+
+# TODO's
+
+## MCP
+
+- Store the schedule in EPROM
+- API to manage schedule
+- Design PCB
+
+## BIT
+
+- Add a temperature sensor to BIT and make it use this sensor to set the temperature to a save setting when no message has been received from the MCP for a specific time.
+- Design PCB
 
 # Useful URL\'s
 
-[EtherCard Examples](https://github.com/thiseldo/EtherCardExamples)
-[Open Energy Monitoring](https://github.com/helxsz/Webinos---Open-energy-monitoring/blob/master/server2_4.pde): Nice example on how to use the EtherCard library.
+- [EtherCard Examples](https://github.com/thiseldo/EtherCardExamples)
+- [Open Energy Monitoring](https://github.com/helxsz/Webinos---Open-energy-monitoring/blob/master/server2_4.pde): Nice example on how to use the EtherCard library.
