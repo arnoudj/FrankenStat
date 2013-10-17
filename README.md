@@ -8,6 +8,7 @@ I started this project to create a thermostat which could be controlled from the
 - have a program for every day of the week with up to 4 time intervals to set a temperature
 - be able to temporarily change a temperature for a time interval
 - holiday mode, set a specific temperature which will be held until the mode is disabled
+- iOS notifications via Prowl when CV is turned on and off
 
 The FrankenStat conists of 2 arduino's. The first is the MCP, which has the
 controls, display and the logic. The 2nd Arduino is called BIT and controls
@@ -111,16 +112,20 @@ Returns the new target temperature.
 
 ## MCP
 
-- Store the schedule in EPROM
+- Store the schedule in EEPROM
 - API to manage schedule
 - Design PCB
+- Make a nice enclosure
+- Set time using NTP
+- Code refactoring, it's ugly and unreadable  ;)
 
 ## BIT
 
 - Add a temperature sensor to BIT and make it use this sensor to set the temperature to a save setting when no message has been received from the MCP for a specific time.
 - Design PCB
+- Make a nice enclosure
 
-# Useful URL\'s
+# Useful URL's
 
 - [EtherCard Examples](https://github.com/thiseldo/EtherCardExamples)
 - [Open Energy Monitoring](https://github.com/helxsz/Webinos---Open-energy-monitoring/blob/master/server2_4.pde): Nice example on how to use the EtherCard library.
