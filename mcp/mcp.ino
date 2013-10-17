@@ -31,10 +31,13 @@
 #define PIN_THERM 0
 #define PIN_DOWN 6
 #define PIN_UP 7
+#define PIN_ETH_CS 8
 #define PIN_RFTX 9
-#define PIN_RELAY 13
+#define PIN_ETH_SI 11
+#define PIN_ETH_SO 12
+#define PIN_ETH_SCK 13
 
-float cur          = 0;
+float cur          = 0.0;
 float tgt          = 16.0;  // Current target temperature
 float tmptgt       = 16.0;  // Target temperature when a temporary
 int   lastTemptr   = 0;
@@ -183,10 +186,8 @@ float scheduledTemp() {
         mode = MODE_AUTO;
         break;
       }
-    case MODE_OVERRIDE:
+    case MODE_HOLIDAY:
       return tmptgt;
-    case MODE_NOFROST:
-      return 5.0;
   }
 
   tgt = target;
@@ -333,7 +334,6 @@ void checkTemp() {
   switch (bit.burn) {
     case BURNING:
       if(cur > tgt + 0.5) {
-        digitalWrite(PIN_RELAY, LOW);
         if(bit.burn != IDLE) {
 #ifdef DEBUG
           Serial.println("Off");
@@ -347,7 +347,6 @@ void checkTemp() {
       break;
     default:
       if(cur < tgt - 0.5) {
-        digitalWrite(PIN_RELAY, HIGH);
         if(bit.burn != BURNING) {
 #ifdef DEBUG
           Serial.println("On");
@@ -427,7 +426,6 @@ void setup() {
   pinMode(PIN_UP, INPUT);
   pinMode(PIN_DOWN, INPUT);
   pinMode(PIN_THERM, INPUT);
-  pinMode(PIN_RELAY, OUTPUT);
 
 #ifdef HAS_RF
   // Setting up the RF Transmitter
@@ -456,6 +454,9 @@ void setup() {
 }
 
 void loop() {
+  //
+  // Check if buttons are pressed
+  //
   up.update();
   if(up.fallingEdge()) {
     setModeTemp();
@@ -470,6 +471,10 @@ void loop() {
     updateDisplay();
   }
 
+  //
+  // Every second check the temperature, update the display, and send
+  // message via RF to BIT.
+  //
   if(millis() - last > 1000) {
     last = millis();
     getTime();
@@ -481,6 +486,9 @@ void loop() {
 #endif
   }
 
+  //
+  // Handle HTTP requests
+  //
 #ifdef HAS_ETH
   uint16_t dat_p;
 
