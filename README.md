@@ -95,9 +95,9 @@ Decrease the target temperature. If the mode is set to auto, then mode will be s
 
 Set the operating mode. Modes can be:
 
-0: Automatic.
-1: Temporary
-2: Holiday
+    0: Automatic
+    1: Temporary
+    2: Holiday
 
 Returns the new target temperature.
 
@@ -114,6 +114,7 @@ Returns the new target temperature.
 
 - Store the schedule in EEPROM
 - API to manage schedule
+- Add LDR to detect if light is on or not, no use heating when no-one is home
 - Design PCB
 - Make a nice enclosure
 - Set time using NTP

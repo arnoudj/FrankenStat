@@ -134,17 +134,30 @@ schedule_t schedule[7][4] = {
 Bounce up = Bounce(PIN_UP, 50);
 Bounce down = Bounce(PIN_DOWN, 50);
 
+// Initialize the bit struct. This is send via RF to the BIT. And contains a
+// serial number and a boolean indicating if the CV should be turned on or
+// not.
 bit_t bit = { BITSERIAL, false };
 
+// ------------------------------------------------------------------------
+
+//
+// Convert hours and minutes to minutes since 00:00.
+//
 int hm2min(int h, int m) {
   return h * 60 + m;
 }
 
+//
+// Convert hours and quarters to minutes since 00:00.
+//
 int hq2min(int h, int q) {
   return h * 60 + q * 15;
 }
 
-// Get the last set temperature for a given day.
+//
+// Get the temperature from the last active time interval of a give day.
+//
 int lastTemp(int d) {
   if(d < 0) {
     d = 6;
@@ -156,16 +169,26 @@ int lastTemp(int d) {
       return schedule[d-1][i].temp;
     }
   }
+  // We should never reach this point. All Days should have at least one
+  // active time mark.
   return 0;
 }
 
-float scheduledTemp() {
-  float target;
+//
+// Set the target temperature using the schedule or the temperatures set
+// for temporary or holiday mode.
+//
+void scheduledTemp() {
+  float target = -1.0;
 
+  // Look up current schedule
   for(int i = 3; i >= 0; i--) {
     if(schedule[tm.Wday-1][i].active == 0) {
       continue;
     }
+    // Current time is measured in hours and minutes, and the times in the
+    // schedule are stored as hours and quarters. Both need to be converted
+    // to minutes since 00:00 so we can compare them.
     if(hq2min(schedule[tm.Wday-1][i].hour, schedule[tm.Wday-1][i].quarters) <
        hm2min(tm.Hour,tm.Minute)) {
       sp_now.day = tm.Wday;
@@ -173,8 +196,13 @@ float scheduledTemp() {
       target = (float)schedule[tm.Wday-1][i].temp / 2 + 10;
     }
   }
-  target = (float)lastTemp(tm.Wday-1) / 2 + 10;
+  // When no time interval is found for this day, we use the last active
+  // temperature setting from yesterday.
+  if(target == -1.0) {
+    target = (float)lastTemp(tm.Wday-1) / 2 + 10;
+  }
 
+  // If mode is other than MODE_AUTO, we use those temperatures.
   switch(mode) {
     case MODE_TEMP:
       if(sp_now.day == sp_tmp.day and sp_now.line == sp_tmp.line) {
@@ -183,33 +211,43 @@ float scheduledTemp() {
         tgt = tmptgt;
       }
       else {
+        // We've reached a new time interval, set mode back to MODE_AUTO.
         mode = MODE_AUTO;
         break;
       }
     case MODE_HOLIDAY:
-      return tmptgt;
+      tgt = tmptgt;
+      return;
   }
 
   tgt = target;
 }
 
-// Read the temperature from the sensor.
+//
+// Read the time from the DS1307 RTC.
+//
+void getTime() {
+  RTC.read(tm);
+}
+
+//
+// Read the temperature from the sensor and convert it to degrees celcius.
+//
 float getTemp() {
-  // We're measuring against 3.3V (which is actually 3.4V), in stead of the
-  // expected 5V. So we will multiply by 0.68.
+  // We're comparing against 3.3V (which is actually 3.4V), in stead of the
+  // expected 5V. So we will multiply the result by 0.68.
   float ThermValue = analogRead(PIN_THERM) * 0.68;
   float mVout=(float) ThermValue*5000.0/1023.0; //3.0V = 3000mV
-  //float TempC=(mVout-400.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Original
   float TempC=(mVout-390.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
 
   return TempC;
 }
 
-void getTime() {
-  RTC.read(tm);
-}
-
-// Return the average temperature for the last minute.
+//
+// The temperature is measured each second. The temperatures from the last 15
+// seconds are stored in an array and the average of the is used as the
+// current temperature.
+//
 void getAvgTemp() {
   lastTemps[lastTemptr] = getTemp();
   if(++lastTemptr == lastTempsz) {
@@ -227,7 +265,10 @@ void getAvgTemp() {
   cur = avg;
 }
 
-// Update the display.
+//
+// Update the LCD display and write some data to serial if debugging is
+// enabled.
+//
 void updateDisplay() {
   int hh = tm.Hour;
   int mm = tm.Minute;
@@ -278,28 +319,31 @@ void updateDisplay() {
 }
 
 #ifdef HAS_PROWL
+//
+// When the CV is turned on or off, send a Prowl notification.
+//
 void sendProwl() {
   if(ether.dnsLookup(prowl_domain)) {
     byte sd = stash.create();
     stash.print("apikey=");
     stash.print(PROWL_APIKEY);
     stash.print("&application=FrankenTherm&event=");
+    /*
     if(bit.burn) {
       stash.print("Idle");
     }
     else {
       stash.print("Burning");
     }
-    stash.save();
-    /*
+    */
     stash.print("&description=");
     if(bit.burn) {
-      stash.print("Started burning.");
+      stash.print("CV on");
     }
     else {
-      stash.print("Stopped burning.");
+      stash.print("CV off");
     }
-    */
+    stash.save();
 
     Stash::prepare(PSTR("POST /publicapi/add HTTP/1.1" "\r\n"
       "User-Agent: FrankenStat/0.1.0" "\r\n"
@@ -316,16 +360,13 @@ void sendProwl() {
       Serial.println(F(">>> RESPONSE RECEIVED ---"));
       Serial.println(reply);
     }
-    else {
-      Serial.println(F(">>> Prowl OK"));
-    }
-  }
-  else {
-    mode=99;
   }
 }
 #endif
 
+//
+// Compare the target and current temperatures and turn the CV on or
+// off when needed.
 void checkTemp() {
   scheduledTemp();
   getAvgTemp();
@@ -333,10 +374,12 @@ void checkTemp() {
 
   switch (bit.burn) {
     case BURNING:
+      // If the current temperature is above the target + 0.5 degrees, then
+      // the CV should be switched off.
       if(cur > tgt + 0.5) {
         if(bit.burn != IDLE) {
 #ifdef DEBUG
-          Serial.println("Off");
+          Serial.println(F("Off"));
 #endif
 #ifdef HAS_PROWL
           sendProwl();
@@ -346,10 +389,12 @@ void checkTemp() {
       }
       break;
     default:
+      // If the current temperature is below the target - 0.5 degrees, then
+      // the CV should be switched on.
       if(cur < tgt - 0.5) {
         if(bit.burn != BURNING) {
 #ifdef DEBUG
-          Serial.println("On");
+          Serial.println(F("On"));
 #endif
 #ifdef HAS_PROWL
           sendProwl();
@@ -384,7 +429,9 @@ uint16_t JSON_status() {
   return bfill.position();
 }
 
+//
 // Temporarily set a new temperature until the next setpoint.
+//
 void setModeTemp() {
   if(mode == MODE_AUTO) {
     mode = MODE_TEMP;
@@ -411,6 +458,8 @@ int16_t process_request(char *str)
   return JSON_status();
 }
 #endif
+
+// ------------------------------------------------------------------------
 
 void setup() {
   analogReference(EXTERNAL);
@@ -452,6 +501,8 @@ void setup() {
   getTime();
   last = millis();
 }
+
+// ------------------------------------------------------------------------
 
 void loop() {
   //
