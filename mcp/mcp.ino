@@ -1,5 +1,5 @@
 // Turn on or off certain functions.
-#undef DEBUG
+#define DEBUG
 #define HAS_LCD
 #define HAS_RF
 #define HAS_ETH
@@ -194,6 +194,7 @@ void scheduledTemp() {
       sp_now.day = tm.Wday;
       sp_now.line = i;
       target = (float)schedule[tm.Wday-1][i].temp / 2 + 10;
+      break;
     }
   }
   // When no time interval is found for this day, we use the last active
@@ -314,6 +315,10 @@ void updateDisplay() {
   Serial.println(cur);
   Serial.print(F("mod: "));
   Serial.println((int)mode);
+  Serial.print(F("day: "));
+  Serial.println((int)sp_now.day);
+  Serial.print(F("line: "));
+  Serial.println((int)sp_now.line);
   Serial.println();
 #endif
 }
