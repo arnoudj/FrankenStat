@@ -200,13 +200,13 @@ void scheduledTemp() {
   // When no time interval is found for this day, we use the last active
   // temperature setting from yesterday.
   if(target == -1.0) {
-    target = (float)lastTemp(tm.Wday-1) / 2 + 10;
+    target = (float)lastTemp(tm.Wday) / 2 + 10;
   }
 
   // If mode is other than MODE_AUTO, we use those temperatures.
   switch(mode) {
     case MODE_TEMP:
-      if(sp_now.day == sp_tmp.day and sp_now.line == sp_tmp.line) {
+      if(sp_now.day == sp_tmp.day && sp_now.line == sp_tmp.line) {
         // Still on the same setpoint on which we set the temporary
         // temperature.
         tgt = tmptgt;
@@ -515,15 +515,23 @@ void loop() {
   //
   up.update();
   if(up.fallingEdge()) {
+#ifdef DEBUG
+    Serial.println(F("UP"));
+#endif
     setModeTemp();
     tmptgt += 0.5;
+    scheduledTemp();
     updateDisplay();
   }
   
   down.update();
   if(down.fallingEdge()) {
+#ifdef DEBUG
+    Serial.println(F("DOWN"));
+#endif
     setModeTemp();
     tmptgt -= 0.5;
+    scheduledTemp();
     updateDisplay();
   }
 
