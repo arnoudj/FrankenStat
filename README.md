@@ -1,5 +1,7 @@
 # An Arduino Thermostat
 
+<img src="FrankenStat MCP.png">
+
 I started this project to create a thermostat which could be controlled from the internet with the following features:
 
 - REST API
@@ -130,3 +132,4 @@ Returns the new target temperature.
 
 - [EtherCard Examples](https://github.com/thiseldo/EtherCardExamples)
 - [Open Energy Monitoring](https://github.com/helxsz/Webinos---Open-energy-monitoring/blob/master/server2_4.pde): Nice example on how to use the EtherCard library.
+- [McMicken Thermostat](http://mcmicken.ca/arduino/Thermostat_V1.html) Another Thermostat

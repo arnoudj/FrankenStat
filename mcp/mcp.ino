@@ -23,6 +23,10 @@
 #include "../include/prowl.h"
 #endif
 
+// Settings
+#define MIN_TEMP  10.0
+#define MAX_TEMP  25.0
+
 // I2C addresses
 #define DS1307_I2C_ADDRESS 0x68
 #define LCD_I2C_ADDRESS 0x27
@@ -44,7 +48,7 @@ int   lastTemptr   = 0;
 int   lastTempsz   = 15;
 float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 char *days[]       = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
-//char *modes[]       = { "AUTO", "TEMP", "MANUAL", "HOLIDAY", "NOFROST" };
+//char *modes[]       = { "AUTO", "TEMP", "HOLIDAY" };
 tmElements_t tm;
 //char    state      = IDLE;
 unsigned long last = millis();
@@ -103,7 +107,7 @@ schedule_t schedule[7][4] = {
   // Thursday
   {
     { 1, 8, 0, 19 },
-    { 1, 8, 2, 50 },
+    { 1, 8, 2, 12 },
     { 1, 18, 2, 21 },
     { 1, 23, 2, 12 }
   },
@@ -239,7 +243,7 @@ float getTemp() {
   // expected 5V. So we will multiply the result by 0.68.
   float ThermValue = analogRead(PIN_THERM) * 0.68;
   float mVout=(float) ThermValue*5000.0/1023.0; //3.0V = 3000mV
-  float TempC=(mVout-390.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
+  float TempC=(mVout-450.0)/19.5; //Ta = (Vout-400mV)/19.5mV //Modified
 
   return TempC;
 }
@@ -299,6 +303,19 @@ void updateDisplay() {
   }
   if(mm < 10) lcd.print('0');
   lcd.print(mm);
+
+  lcd.setCursor(8,1);
+  switch (mode) {
+    case 0:
+      lcd.print(F("AUTO   "));
+      break;
+    case 1:
+      lcd.print(F("TEMP   "));
+      break;
+    case 2:
+      lcd.print(F("HOLIDAY"));
+      break;
+  }
 #endif
 
 #ifdef DEBUG
@@ -452,14 +469,22 @@ void setModeTemp() {
 int16_t process_request(char *str)
 {
   if (strncmp("GET /up ", str, 8)==0){
-    setModeTemp();
-    tmptgt += 0.5;
+    if(tmptgt < MAX_TEMP) {
+      setModeTemp();
+      tmptgt += 0.5;
+      scheduledTemp();
+    }
   }
   if (strncmp("GET /down ", str, 10)==0){
-    setModeTemp();
-    tmptgt -= 0.5;
+    if(tmptgt > MIN_TEMP) {
+      setModeTemp();
+      tmptgt -= 0.5;
+      scheduledTemp();
+    }
   }
-  scheduledTemp();
+  if (strncmp("GET /set/", str, 9)==0){
+  }
+
   return JSON_status();
 }
 #endif
