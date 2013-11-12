@@ -10,7 +10,7 @@ I started this project to create a thermostat which could be controlled from the
 - have a program for every day of the week with up to 4 time intervals to set a temperature
 - be able to temporarily change a temperature for a time interval
 - holiday mode, set a specific temperature which will be held until the mode is disabled
-- iOS notifications via Prowl when CV is turned on and off
+- Optional: iOS notifications via Prowl when CV is turned on and off
 
 The FrankenStat conists of 2 arduino's. The first is the MCP, which has the
 controls, display and the logic. The 2nd Arduino is called BIT and controls
@@ -60,9 +60,7 @@ I noticed that the temerature would go up, when the LED was turned on by about 0
 
 To read the status and control the temperature the following URL's can be used:
 
-## /
-
-Returns the status of the thermostat.
+All API calls return a JSON with the target temperature, current temperature, status of the CV and current mode.
 
     {
       "target": 21,
@@ -71,29 +69,22 @@ Returns the status of the thermostat.
       "mode": 0
     }
 
+## /
+
+Returns the status of the thermostat.
+
+
 ## /up
 
-Increase the target temperature. If the mode is set to auto, then mode will be set to temp. Returns the new target temperature and mode.
-
-    {
-      "target": 21.5,
-      "current": 21.15,
-      "burner": false,
-      "mode": 1
-    }
+Increase the target temperature. If the mode is set to auto, then mode will be set to temp.
 
 ## /down
 
-Decrease the target temperature. If the mode is set to auto, then mode will be set to temp. Returns the new target temperature and mode.
-
-    {
-      "target": 21.5,
-      "current": 21.15,
-      "burner": false,
-      "mode": 1
-    }
+Decrease the target temperature. If the mode is set to auto, then mode will be set to temp.
 
 ## /mode/MODE[/16]
+
+TODO: Implement
 
 Set the operating mode. Modes can be:
 
@@ -101,14 +92,11 @@ Set the operating mode. Modes can be:
     1: Temporary
     2: Holiday
 
-Returns the new target temperature.
+# /time/HH:MM
 
-    {
-      "target": 16.0,
-      "current": 21.15,
-      "burner": false,
-      "mode": 1
-    }
+TODO: Implement
+
+Set the time.
 
 # TODO's
 
@@ -119,7 +107,8 @@ Returns the new target temperature.
 - Add LDR to detect if light is on or not, no use heating when no-one is home
 - Design PCB
 - Make a nice enclosure
-- Set time using NTP
+- Set time using NTP or API call
+- API for setting the mode
 - Code refactoring, it's ugly and unreadable  ;)
 
 ## BIT

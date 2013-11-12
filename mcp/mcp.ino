@@ -2,8 +2,8 @@
 #define DEBUG
 #define HAS_LCD
 #define HAS_RF
-#define HAS_ETH
-#define HAS_PROWL
+#undef HAS_ETH
+#undef HAS_PROWL
 
 #include <DS1307RTC.h>
 #include <Time.h>
@@ -29,10 +29,11 @@
 
 // I2C addresses
 #define DS1307_I2C_ADDRESS 0x68
-#define LCD_I2C_ADDRESS 0x27
+#define LCD_I2C_ADDRESS 0x38
 
 // Pin assignment
 #define PIN_THERM 0
+#define PIN_MODE 5
 #define PIN_DOWN 6
 #define PIN_UP 7
 #define PIN_ETH_CS 8
@@ -48,9 +49,7 @@ int   lastTemptr   = 0;
 int   lastTempsz   = 15;
 float lastTemps[]  = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 char *days[]       = { "", "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
-//char *modes[]       = { "AUTO", "TEMP", "HOLIDAY" };
 tmElements_t tm;
-//char    state      = IDLE;
 unsigned long last = millis();
 char  mode = 0;
 
@@ -135,8 +134,9 @@ schedule_t schedule[7][4] = {
 };
 
 // Initialize debouncer
-Bounce up = Bounce(PIN_UP, 50);
-Bounce down = Bounce(PIN_DOWN, 50);
+Bounce but_up = Bounce(PIN_UP, 50);
+Bounce but_down = Bounce(PIN_DOWN, 50);
+Bounce but_mode = Bounce(PIN_MODE, 50);
 
 // Initialize the bit struct. This is send via RF to the BIT. And contains a
 // serial number and a boolean indicating if the CV should be turned on or
@@ -275,8 +275,9 @@ void getAvgTemp() {
 // enabled.
 //
 void updateDisplay() {
-  int hh = tm.Hour;
-  int mm = tm.Minute;
+  // 16x2 display:
+  // [T:21.1 Tu 20:00 ]
+  // [C:16.4 AUTO     ]
 
 #ifdef HAS_LCD
   // Current and Target temperature
@@ -293,16 +294,16 @@ void updateDisplay() {
 
   // Time
   lcd.setCursor(11,0);
-  if(hh < 10) lcd.print('0');
-  lcd.print(hh);
+  if(tm.Hour < 10) lcd.print('0');
+  lcd.print(tm.Hour);
   if(tm.Second % 2 == 0) {
     lcd.print(":");
   }
   else {
     lcd.print(" ");
   }
-  if(mm < 10) lcd.print('0');
-  lcd.print(mm);
+  if(tm.Minute < 10) lcd.print('0');
+  lcd.print(tm.Minute);
 
   lcd.setCursor(8,1);
   switch (mode) {
@@ -321,11 +322,11 @@ void updateDisplay() {
 #ifdef DEBUG
   Serial.print(days[tm.Wday]);
   Serial.print(" ");
-  if(hh < 10) Serial.print('0');
-  Serial.print(hh);
+  if(tm.Hour < 10) Serial.print('0');
+  Serial.print(tm.Hour);
   Serial.print(":");
-  if(mm < 10) Serial.print('0');
-  Serial.println(mm);
+  if(tm.Minute < 10) Serial.print('0');
+  Serial.println(tm.Minute);
   Serial.print(F("tgt: "));
   Serial.println(tgt);
   Serial.print(F("cur: "));
@@ -450,6 +451,7 @@ uint16_t JSON_status() {
   );
   return bfill.position();
 }
+#endif
 
 //
 // Temporarily set a new temperature until the next setpoint.
@@ -463,6 +465,7 @@ void setModeTemp() {
   }
 }
 
+#ifdef HAS_ETH
 //
 // Read the HTTP request and returns the corresponding reply.
 //
@@ -538,8 +541,27 @@ void loop() {
   //
   // Check if buttons are pressed
   //
-  up.update();
-  if(up.fallingEdge()) {
+  but_mode.update();
+  if(but_mode.fallingEdge()) {
+    switch(mode) {
+      case MODE_AUTO:
+        tmptgt = tgt;
+        break;
+      case MODE_TEMP:
+        mode = MODE_HOLIDAY;
+        tmptgt = 16;
+        break;
+      case MODE_HOLIDAY:
+        mode = MODE_AUTO;
+        break;
+      default:
+        mode = MODE_AUTO;
+    }
+    scheduledTemp();
+    updateDisplay();
+  }
+  but_up.update();
+  if(but_up.fallingEdge()) {
 #ifdef DEBUG
     Serial.println(F("UP"));
 #endif
@@ -549,8 +571,8 @@ void loop() {
     updateDisplay();
   }
   
-  down.update();
-  if(down.fallingEdge()) {
+  but_down.update();
+  if(but_down.fallingEdge()) {
 #ifdef DEBUG
     Serial.println(F("DOWN"));
 #endif
